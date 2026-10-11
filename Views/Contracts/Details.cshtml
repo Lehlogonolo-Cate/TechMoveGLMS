@@ -1,0 +1,100 @@
+﻿@model TechMoveGLMS.Web.Models.Contract
+
+@using TechMoveGLMS.Web.Models
+
+@{
+    ViewData["Title"] = "Contract Details";
+
+    string badgeClass = Model.Status switch
+    {
+        ContractStatus.Active => "bg-success",
+        ContractStatus.Expired => "bg-danger",
+        ContractStatus.OnHold => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+
+            <div class="card-header bg-info text-white">
+                <h2 class="h4 mb-0">Contract Details</h2>
+            </div>
+
+            <div class="card-body">
+                <dl class="row mb-0">
+
+                    <dt class="col-sm-4">Client</dt>
+                    <dd class="col-sm-8">@Model.Client?.Name</dd>
+
+                    <dt class="col-sm-4">Contact Details</dt>
+                    <dd class="col-sm-8">
+                        @Model.Client?.ContactDetails
+                    </dd>
+
+                    <dt class="col-sm-4">Client Region</dt>
+                    <dd class="col-sm-8">@Model.Client?.Region</dd>
+
+                    <dt class="col-sm-4">Service Level</dt>
+                    <dd class="col-sm-8">@Model.ServiceLevel</dd>
+
+                    <dt class="col-sm-4">Start Date</dt>
+                    <dd class="col-sm-8">
+                        @Model.StartDate.ToString("dd MMMM yyyy")
+                    </dd>
+
+                    <dt class="col-sm-4">End Date</dt>
+                    <dd class="col-sm-8">
+                        @Model.EndDate.ToString("dd MMMM yyyy")
+                    </dd>
+
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge @badgeClass">
+                            @Model.Status
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4">Service Requests</dt>
+                    <dd class="col-sm-8">
+                        @Model.ServiceRequests.Count
+                    </dd>
+
+                    <dt class="col-sm-4">Legal Agreement</dt>
+                    <dd class="col-sm-8">
+                        @if (!string.IsNullOrWhiteSpace(
+                            Model.AgreementStoredFileName))
+                        {
+                            <a asp-action="DownloadAgreement"
+                               asp-route-id="@Model.ContractId"
+                               class="btn btn-sm btn-outline-success">
+                                Download @Model.AgreementFileName
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">
+                                No agreement uploaded
+                            </span>
+                        }
+                    </dd>
+
+                </dl>
+            </div>
+
+            <div class="card-footer d-flex gap-2">
+                <a asp-action="Edit"
+                   asp-route-id="@Model.ContractId"
+                   class="btn btn-primary">
+                    Edit Contract
+                </a>
+
+                <a asp-action="Index"
+                   class="btn btn-outline-secondary">
+                    Back to Contracts
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

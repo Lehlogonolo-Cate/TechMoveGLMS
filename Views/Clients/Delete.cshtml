@@ -1,0 +1,69 @@
+﻿@model TechMoveGLMS.Web.Models.Client
+
+@{
+    ViewData["Title"] = "Delete Client";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <div class="card shadow-sm border-danger">
+
+            <div class="card-header bg-danger text-white">
+                <h2 class="h4 mb-0">Delete Client</h2>
+            </div>
+
+            <div class="card-body">
+
+                <div class="alert alert-warning">
+                    Are you sure you want to delete this client?
+                    This action cannot be undone.
+                </div>
+
+                <dl class="row">
+
+                    <dt class="col-sm-4">Client Name</dt>
+                    <dd class="col-sm-8">@Model.Name</dd>
+
+                    <dt class="col-sm-4">Contact Details</dt>
+                    <dd class="col-sm-8">@Model.ContactDetails</dd>
+
+                    <dt class="col-sm-4">Region</dt>
+                    <dd class="col-sm-8">@Model.Region</dd>
+
+                    <dt class="col-sm-4">Number of Contracts</dt>
+                    <dd class="col-sm-8">@Model.Contracts.Count</dd>
+
+                </dl>
+
+                @if (Model.Contracts.Any())
+                {
+                    <div class="alert alert-danger">
+                        This client cannot be deleted because it has associated
+                        contracts. Delete or reassign the contracts first.
+                    </div>
+                }
+
+            </div>
+
+            <div class="card-footer">
+                <form asp-action="Delete" method="post">
+
+                    <input type="hidden" asp-for="ClientId" />
+
+                    @if (!Model.Contracts.Any())
+                    {
+                        <button type="submit" class="btn btn-danger">
+                            Confirm Delete
+                        </button>
+                    }
+
+                    <a asp-action="Index"
+                       class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

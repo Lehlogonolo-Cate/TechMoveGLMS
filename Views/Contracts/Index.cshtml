@@ -1,0 +1,215 @@
+﻿@model IEnumerable<TechMoveGLMS.Web.Models.Contract>
+
+@using TechMoveGLMS.Web.Models
+
+@{
+    ViewData["Title"] = "Contracts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>Contract Management</h1>
+        <p class="text-muted">
+            Manage client agreements, service levels and contract statuses.
+        </p>
+    </div>
+
+    <a asp-action="Create" class="btn btn-primary">
+        Add New Contract
+    </a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @TempData["SuccessMessage"]
+
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["ErrorMessage"]
+
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light">
+        <strong>Search and Filter Contracts</strong>
+    </div>
+
+    <div class="card-body">
+        <form asp-action="Index"
+              method="get"
+              class="row g-3">
+
+            <div class="col-md-3">
+                <label class="form-label">Client</label>
+
+                <select name="clientId"
+                        asp-items="ViewBag.Clients"
+                        class="form-select">
+                    <option value="">All clients</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+
+                <select name="status" class="form-select">
+                    <option value="">All statuses</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Active">Active</option>
+                    <option value="Expired">Expired</option>
+                    <option value="OnHold">On Hold</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Start Date</label>
+
+                <input type="date"
+                       name="startDate"
+                       value="@ViewBag.StartDate"
+                       class="form-control" />
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">End Date</label>
+
+                <input type="date"
+                       name="endDate"
+                       value="@ViewBag.EndDate"
+                       class="form-control" />
+            </div>
+
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button type="submit"
+                        class="btn btn-primary">
+                    Filter
+                </button>
+
+                <a asp-action="Index"
+                   class="btn btn-outline-secondary">
+                    Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        No contracts were found. Select
+        <strong>Add New Contract</strong> to create one.
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Client</th>
+                            <th>Service Level</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Status</th>
+                            <th>Requests</th>
+                            <th>Agreement</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var contract in Model)
+                        {
+                            string badgeClass = contract.Status switch
+                            {
+                                ContractStatus.Active => "bg-success",
+                                ContractStatus.Expired => "bg-danger",
+                                ContractStatus.OnHold => "bg-warning text-dark",
+                                _ => "bg-secondary"
+                            };
+
+                            <tr>
+                                <td>@contract.Client?.Name</td>
+
+                                <td>@contract.ServiceLevel</td>
+
+                                <td>
+                                    @contract.StartDate.ToString("dd MMM yyyy")
+                                </td>
+
+                                <td>
+                                    @contract.EndDate.ToString("dd MMM yyyy")
+                                </td>
+
+                                <td>
+                                    <span class="badge @badgeClass">
+                                        @contract.Status
+                                    </span>
+                                </td>
+
+                                <td>
+                                    @contract.ServiceRequests.Count
+                                </td>
+
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(
+                                        contract.AgreementStoredFileName))
+                                    {
+                                        <a asp-action="DownloadAgreement"
+                                           asp-route-id="@contract.ContractId"
+                                           class="btn btn-sm btn-outline-success">
+                                            Download PDF
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">
+                                            No file
+                                        </span>
+                                    }
+                                </td>
+
+                                <td class="text-end">
+                                    <a asp-action="Details"
+                                       asp-route-id="@contract.ContractId"
+                                       class="btn btn-sm btn-outline-info">
+                                        Details
+                                    </a>
+
+                                    <a asp-action="Edit"
+                                       asp-route-id="@contract.ContractId"
+                                       class="btn btn-sm btn-outline-primary">
+                                        Edit
+                                    </a>
+
+                                    <a asp-action="Delete"
+                                       asp-route-id="@contract.ContractId"
+                                       class="btn btn-sm btn-outline-danger">
+                                        Delete
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

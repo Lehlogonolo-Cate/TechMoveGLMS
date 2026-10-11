@@ -1,0 +1,134 @@
+﻿@model TechMoveGLMS.Web.Models.ServiceRequest
+@using TechMoveGLMS.Web.Models
+
+@{
+    ViewData["Title"] = "Service Request Details";
+
+    var statusClass = Model.Status switch
+    {
+        ServiceRequestStatus.Pending => "bg-warning text-dark",
+        ServiceRequestStatus.Approved => "bg-info text-dark",
+        ServiceRequestStatus.InProgress => "bg-primary",
+        ServiceRequestStatus.Completed => "bg-success",
+        ServiceRequestStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="container py-4">
+    <div class="card shadow mx-auto"
+         style="max-width: 900px;">
+
+        <div class="card-header bg-info text-white">
+            <h2 class="mb-0">Service Request Details</h2>
+        </div>
+
+        <div class="card-body p-4">
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    Request Number
+                </div>
+
+                <div class="col-md-8">
+                    SR-@Model.ServiceRequestId.ToString("D4")
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">Client</div>
+
+                <div class="col-md-8">
+                    @Model.Contract?.Client?.Name
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    Service Level
+                </div>
+
+                <div class="col-md-8">
+                    @Model.Contract?.ServiceLevel
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    Description
+                </div>
+
+                <div class="col-md-8">
+                    @Model.Description
+                </div>
+            </div>
+
+            <hr />
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    Cost in USD
+                </div>
+
+                <div class="col-md-8">
+                    $@Model.CostUsd.ToString("N2")
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    USD/ZAR Exchange Rate
+                </div>
+
+                <div class="col-md-8">
+                    @Model.ExchangeRate.ToString("N4")
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    Cost in ZAR
+                </div>
+
+                <div class="col-md-8 fw-bold text-success">
+                    R @Model.Cost.ToString("N2")
+                </div>
+            </div>
+
+            <hr />
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">Status</div>
+
+                <div class="col-md-8">
+                    <span class="badge @statusClass">
+                        @Model.Status
+                    </span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4 fw-bold">
+                    Date Created
+                </div>
+
+                <div class="col-md-8">
+                    @Model.CreatedAt.ToString(
+                        "dd MMMM yyyy HH:mm")
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer">
+            <a asp-action="Edit"
+               asp-route-id="@Model.ServiceRequestId"
+               class="btn btn-primary">
+                Edit Request
+            </a>
+
+            <a asp-action="Index"
+               class="btn btn-outline-secondary">
+                Back to Requests
+            </a>
+        </div>
+    </div>
+</div>
