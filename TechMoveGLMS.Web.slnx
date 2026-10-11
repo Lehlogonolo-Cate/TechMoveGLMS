@@ -1,4 +1,4 @@
 <Solution>
-  <Project Path="../TechMoveGLMS.Tests/TechMoveGLMS.Tests.csproj" Id="eedcdc2f-dc55-4dee-aa26-30e82af0afd3" />
+  <Project Path="TechMoveGLMS.Tests/TechMoveGLMS.Tests.csproj" />
   <Project Path="TechMoveGLMS.Web.csproj" />
 </Solution>
