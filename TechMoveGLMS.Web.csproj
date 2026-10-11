@@ -5,10 +5,14 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseAppHost>false</UseAppHost>
+		<DefaultItemExcludes>$(DefaultItemExcludes);TechMoveGLMS.Tests/**</DefaultItemExcludes>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<Compile Remove="TechMoveGLMS.Tests/**/*.cs" />
+		<Content Remove="TechMoveGLMS.Tests/**" />
+		<None Remove="TechMoveGLMS.Tests/**" />
+		<EmbeddedResource Remove="TechMoveGLMS.Tests/**" />
 	</ItemGroup>
 
 	<ItemGroup>
