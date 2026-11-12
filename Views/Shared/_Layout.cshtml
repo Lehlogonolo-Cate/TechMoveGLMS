@@ -1,4 +1,12 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.AspNetCore.Http
+
+@{
+    var jwtToken = Context.Session.GetString("JwtToken");
+    var username = Context.Session.GetString("Username");
+    var isLoggedIn = !string.IsNullOrWhiteSpace(jwtToken);
+}
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -6,7 +14,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0" />
 
-    <title>@ViewData["Title"] - TechMoveGLMS.Web</title>
+    <title>@ViewData["Title"] - TechMoveGLMS</title>
 
     <script type="importmap"></script>
 
@@ -24,15 +32,14 @@
 
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm
-            navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-light bg-white
+            border-bottom box-shadow mb-3">
 
             <div class="container-fluid">
                 <a class="navbar-brand"
-                   asp-area=""
                    asp-controller="Home"
                    asp-action="Index">
-                    TechMoveGLMS.Web
+                    TechMoveGLMS
                 </a>
 
                 <button class="navbar-toggler"
@@ -52,45 +59,79 @@
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
                             <a class="nav-link text-dark"
-                               asp-area=""
                                asp-controller="Home"
                                asp-action="Index">
                                 Home
                             </a>
                         </li>
 
+                        @if (isLoggedIn)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-controller="Clients"
+                                   asp-action="Index">
+                                    Clients
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-controller="Contracts"
+                                   asp-action="Index">
+                                    Contracts
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-controller="ServiceRequests"
+                                   asp-action="Index">
+                                    Service Requests
+                                </a>
+                            </li>
+                        }
+
                         <li class="nav-item">
                             <a class="nav-link text-dark"
-                               asp-area=""
                                asp-controller="Home"
                                asp-action="Privacy">
                                 Privacy
                             </a>
                         </li>
+                    </ul>
 
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-controller="Clients"
-                               asp-action="Index">
-                                Clients
-                            </a>
-                        </li>
+                    <ul class="navbar-nav">
+                        @if (isLoggedIn)
+                        {
+                            <li class="nav-item">
+                                <span class="nav-link text-dark">
+                                    Welcome, @username
+                                </span>
+                            </li>
 
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-controller="Contracts"
-                               asp-action="Index">
-                                Contracts
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <form asp-controller="Auth"
+                                      asp-action="Logout"
+                                      method="post">
 
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-controller="ServiceRequests"
-                               asp-action="Index">
-                                Service Requests
-                            </a>
-                        </li>
+                                    <button type="submit"
+                                            class="btn btn-link nav-link text-dark">
+                                        Logout
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-controller="Auth"
+                                   asp-action="Login">
+                                    Login
+                                </a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>
@@ -98,6 +139,36 @@
     </header>
 
     <div class="container">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show"
+                 role="alert">
+
+                @TempData["SuccessMessage"]
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close">
+                </button>
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show"
+                 role="alert">
+
+                @TempData["ErrorMessage"]
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close">
+                </button>
+            </div>
+        }
+
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
@@ -105,10 +176,9 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 - TechMoveGLMS.Web -
+            &copy; 2026 - TechMoveGLMS -
 
-            <a asp-area=""
-               asp-controller="Home"
+            <a asp-controller="Home"
                asp-action="Privacy">
                 Privacy
             </a>

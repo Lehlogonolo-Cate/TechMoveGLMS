@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TechMoveGLMS.Web.Migrations
+namespace TechMoveGLMS.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialApiCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -48,7 +48,7 @@ namespace TechMoveGLMS.Web.Migrations
                         column: x => x.ClientId,
                         principalTable: "Clients",
                         principalColumn: "ClientId",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -59,9 +59,9 @@ namespace TechMoveGLMS.Web.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ContractId = table.Column<int>(type: "int", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    CostUsd = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
-                    ExchangeRate = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
-                    Cost = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    CostUsd = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ExchangeRate = table.Column<decimal>(type: "decimal(18,4)", nullable: false),
+                    Cost = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -73,18 +73,13 @@ namespace TechMoveGLMS.Web.Migrations
                         column: x => x.ContractId,
                         principalTable: "Contracts",
                         principalColumn: "ContractId",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Contracts_ClientId",
                 table: "Contracts",
                 column: "ClientId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Contracts_Status_StartDate_EndDate",
-                table: "Contracts",
-                columns: new[] { "Status", "StartDate", "EndDate" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_ServiceRequests_ContractId",

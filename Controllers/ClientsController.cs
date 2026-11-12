@@ -1,14 +1,17 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using TechMoveGLMS.Web.Filters;
 using TechMoveGLMS.Web.Models;
 using TechMoveGLMS.Web.Services;
 
 namespace TechMoveGLMS.Web.Controllers
 {
+    [SessionAuthorize]
     public class ClientsController : Controller
     {
         private readonly IClientService _clientService;
 
-        public ClientsController(IClientService clientService)
+        public ClientsController(
+            IClientService clientService)
         {
             _clientService = clientService;
         }
@@ -16,7 +19,9 @@ namespace TechMoveGLMS.Web.Controllers
         // GET: Clients
         public async Task<IActionResult> Index()
         {
-            var clients = await _clientService.GetAllAsync();
+            var clients =
+                await _clientService.GetAllAsync();
+
             return View(clients);
         }
 
@@ -28,7 +33,8 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            var client = await _clientService.GetByIdAsync(id.Value);
+            var client =
+                await _clientService.GetByIdAsync(id.Value);
 
             if (client == null)
             {
@@ -48,7 +54,8 @@ namespace TechMoveGLMS.Web.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            [Bind("Name,ContactDetails,Region")] Client client)
+            [Bind("Name,ContactDetails,Region")]
+            Client client)
         {
             if (!ModelState.IsValid)
             {
@@ -71,7 +78,8 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            var client = await _clientService.GetByIdAsync(id.Value);
+            var client =
+                await _clientService.GetByIdAsync(id.Value);
 
             if (client == null)
             {
@@ -86,7 +94,9 @@ namespace TechMoveGLMS.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
             int id,
-            [Bind("ClientId,Name,ContactDetails,Region")] Client client)
+            [Bind(
+                "ClientId,Name,ContactDetails,Region")]
+            Client client)
         {
             if (id != client.ClientId)
             {
@@ -98,7 +108,8 @@ namespace TechMoveGLMS.Web.Controllers
                 return View(client);
             }
 
-            var updated = await _clientService.UpdateAsync(client);
+            var updated =
+                await _clientService.UpdateAsync(client);
 
             if (!updated)
             {
@@ -119,7 +130,8 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            var client = await _clientService.GetByIdAsync(id.Value);
+            var client =
+                await _clientService.GetByIdAsync(id.Value);
 
             if (client == null)
             {
@@ -132,9 +144,11 @@ namespace TechMoveGLMS.Web.Controllers
         // POST: Clients/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(
+            int id)
         {
-            var deleted = await _clientService.DeleteAsync(id);
+            var deleted =
+                await _clientService.DeleteAsync(id);
 
             if (!deleted)
             {

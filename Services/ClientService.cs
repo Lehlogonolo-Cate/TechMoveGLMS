@@ -1,76 +1,137 @@
-﻿using Microsoft.EntityFrameworkCore;
-using TechMoveGLMS.Web.Data;
+﻿using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using TechMoveGLMS.Web.Models;
 
 namespace TechMoveGLMS.Web.Services
 {
     public class ClientService : IClientService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly HttpClient _httpClient;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ClientService(ApplicationDbContext context)
+        public ClientService(
+            HttpClient httpClient,
+            IHttpContextAccessor httpContextAccessor)
         {
-            _context = context;
+            _httpClient = httpClient;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<List<Client>> GetAllAsync()
         {
-            return await _context.Clients
-                .AsNoTracking()
-                .OrderBy(client => client.Name)
-                .ToListAsync();
+            AddAuthorizationHeader();
+
+            var clients =
+                await _httpClient.GetFromJsonAsync<List<Client>>(
+                    "api/Clients");
+
+            return clients ?? new List<Client>();
         }
 
         public async Task<Client?> GetByIdAsync(int id)
         {
-            return await _context.Clients
-                .AsNoTracking()
-                .Include(client => client.Contracts)
-                .FirstOrDefaultAsync(client => client.ClientId == id);
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/Clients/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content
+                .ReadFromJsonAsync<Client>();
         }
 
         public async Task<Client> CreateAsync(Client client)
         {
-            _context.Clients.Add(client);
-            await _context.SaveChangesAsync();
+            AddAuthorizationHeader();
 
-            return client;
+            var response = await _httpClient.PostAsJsonAsync(
+                "api/Clients",
+                client);
+
+            response.EnsureSuccessStatusCode();
+
+            var createdClient = await response.Content
+                .ReadFromJsonAsync<Client>();
+
+            return createdClient
+                ?? throw new InvalidOperationException(
+                    "The API did not return the created client.");
         }
 
         public async Task<bool> UpdateAsync(Client client)
         {
-            if (!await ExistsAsync(client.ClientId))
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.PutAsJsonAsync(
+                $"api/Clients/{client.ClientId}",
+                client);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return false;
             }
 
-            _context.Clients.Update(client);
-            await _context.SaveChangesAsync();
+            response.EnsureSuccessStatusCode();
 
             return true;
         }
 
         public async Task<bool> DeleteAsync(int id)
         {
-            var client = await _context.Clients
-                .Include(item => item.Contracts)
-                .FirstOrDefaultAsync(item => item.ClientId == id);
+            AddAuthorizationHeader();
 
-            if (client == null || client.Contracts.Count > 0)
+            var response = await _httpClient.DeleteAsync(
+                $"api/Clients/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound ||
+                response.StatusCode == HttpStatusCode.Conflict ||
+                response.StatusCode == HttpStatusCode.BadRequest)
             {
                 return false;
             }
 
-            _context.Clients.Remove(client);
-            await _context.SaveChangesAsync();
+            response.EnsureSuccessStatusCode();
 
             return true;
         }
 
         public async Task<bool> ExistsAsync(int id)
         {
-            return await _context.Clients
-                .AnyAsync(client => client.ClientId == id);
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/Clients/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            return true;
+        }
+
+        private void AddAuthorizationHeader()
+        {
+            var token = _httpContextAccessor
+                .HttpContext?
+                .Session
+                .GetString("JwtToken");
+
+            _httpClient.DefaultRequestHeaders.Authorization =
+                string.IsNullOrWhiteSpace(token)
+                    ? null
+                    : new AuthenticationHeaderValue(
+                        "Bearer",
+                        token);
         }
     }
 }

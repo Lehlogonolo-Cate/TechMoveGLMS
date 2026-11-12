@@ -5,27 +5,27 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using TechMoveGLMS.Web.Data;
+using TechMoveGLMS.Api.Data;
 
 #nullable disable
 
-namespace TechMoveGLMS.Web.Migrations
+namespace TechMoveGLMS.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261006090947_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20261112191733_InitialApiCreate")]
+    partial class InitialApiCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.Client", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.Client", b =>
                 {
                     b.Property<int>("ClientId")
                         .ValueGeneratedOnAdd()
@@ -53,7 +53,7 @@ namespace TechMoveGLMS.Web.Migrations
                     b.ToTable("Clients");
                 });
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.Contract", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.Contract", b =>
                 {
                     b.Property<int>("ContractId")
                         .ValueGeneratedOnAdd()
@@ -88,12 +88,10 @@ namespace TechMoveGLMS.Web.Migrations
 
                     b.HasIndex("ClientId");
 
-                    b.HasIndex("Status", "StartDate", "EndDate");
-
                     b.ToTable("Contracts");
                 });
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.ServiceRequest", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.ServiceRequest", b =>
                 {
                     b.Property<int>("ServiceRequestId")
                         .ValueGeneratedOnAdd()
@@ -105,11 +103,9 @@ namespace TechMoveGLMS.Web.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("Cost")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("CostUsd")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -121,7 +117,6 @@ namespace TechMoveGLMS.Web.Migrations
                         .HasColumnType("nvarchar(500)");
 
                     b.Property<decimal>("ExchangeRate")
-                        .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("Status")
@@ -134,34 +129,34 @@ namespace TechMoveGLMS.Web.Migrations
                     b.ToTable("ServiceRequests");
                 });
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.Contract", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.Contract", b =>
                 {
-                    b.HasOne("TechMoveGLMS.Web.Models.Client", "Client")
+                    b.HasOne("TechMoveGLMS.Api.Models.Client", "Client")
                         .WithMany("Contracts")
                         .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.ServiceRequest", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.ServiceRequest", b =>
                 {
-                    b.HasOne("TechMoveGLMS.Web.Models.Contract", "Contract")
+                    b.HasOne("TechMoveGLMS.Api.Models.Contract", "Contract")
                         .WithMany("ServiceRequests")
                         .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Contract");
                 });
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.Client", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.Client", b =>
                 {
                     b.Navigation("Contracts");
                 });
 
-            modelBuilder.Entity("TechMoveGLMS.Web.Models.Contract", b =>
+            modelBuilder.Entity("TechMoveGLMS.Api.Models.Contract", b =>
                 {
                     b.Navigation("ServiceRequests");
                 });

@@ -1,17 +1,20 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using TechMoveGLMS.Web.Filters;
 using TechMoveGLMS.Web.Models;
 using TechMoveGLMS.Web.Services;
 
 namespace TechMoveGLMS.Web.Controllers
 {
+    [SessionAuthorize]
     public class ContractsController : Controller
     {
         private readonly IContractService _contractService;
         private readonly IClientService _clientService;
         private readonly IWebHostEnvironment _environment;
 
-        private const long MaximumFileSize = 5 * 1024 * 1024;
+        private const long MaximumFileSize =
+            5 * 1024 * 1024;
 
         public ContractsController(
             IContractService contractService,
@@ -39,8 +42,10 @@ namespace TechMoveGLMS.Web.Controllers
             await LoadFilterOptionsAsync(clientId);
 
             ViewBag.SelectedStatus = status;
-            ViewBag.StartDate = startDate?.ToString("yyyy-MM-dd");
-            ViewBag.EndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.StartDate =
+                startDate?.ToString("yyyy-MM-dd");
+            ViewBag.EndDate =
+                endDate?.ToString("yyyy-MM-dd");
 
             return View(contracts);
         }
@@ -53,7 +58,8 @@ namespace TechMoveGLMS.Web.Controllers
             }
 
             Contract? contract =
-                await _contractService.GetByIdAsync(id.Value);
+                await _contractService.GetByIdAsync(
+                    id.Value);
 
             if (contract == null)
             {
@@ -92,21 +98,43 @@ namespace TechMoveGLMS.Web.Controllers
 
             if (!ModelState.IsValid)
             {
-                await LoadClientsAsync(contract.ClientId);
+                await LoadClientsAsync(
+                    contract.ClientId);
+
                 return View(contract);
             }
 
             if (agreementFile != null)
             {
-                await SaveAgreementFileAsync(contract, agreementFile);
+                await SaveAgreementFileAsync(
+                    contract,
+                    agreementFile);
             }
 
-            await _contractService.CreateAsync(contract);
+            try
+            {
+                await _contractService.CreateAsync(
+                    contract);
 
-            TempData["SuccessMessage"] =
-                "Contract created successfully.";
+                TempData["SuccessMessage"] =
+                    "Contract created successfully.";
 
-            return RedirectToAction(nameof(Index));
+                return RedirectToAction(
+                    nameof(Index));
+            }
+            catch (HttpRequestException)
+            {
+                DeleteAgreementFile(contract);
+
+                ModelState.AddModelError(
+                    string.Empty,
+                    "The contract could not be created because the API request failed.");
+
+                await LoadClientsAsync(
+                    contract.ClientId);
+
+                return View(contract);
+            }
         }
 
         public async Task<IActionResult> Edit(int? id)
@@ -117,14 +145,16 @@ namespace TechMoveGLMS.Web.Controllers
             }
 
             Contract? contract =
-                await _contractService.GetByIdAsync(id.Value);
+                await _contractService.GetByIdAsync(
+                    id.Value);
 
             if (contract == null)
             {
                 return NotFound();
             }
 
-            await LoadClientsAsync(contract.ClientId);
+            await LoadClientsAsync(
+                contract.ClientId);
 
             return View(contract);
         }
@@ -150,7 +180,9 @@ namespace TechMoveGLMS.Web.Controllers
 
             if (!ModelState.IsValid)
             {
-                await LoadClientsAsync(contract.ClientId);
+                await LoadClientsAsync(
+                    contract.ClientId);
+
                 return View(contract);
             }
 
@@ -162,26 +194,39 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            existingContract.ClientId = contract.ClientId;
-            existingContract.StartDate = contract.StartDate;
-            existingContract.EndDate = contract.EndDate;
+            /*
+             * The current Contracts API exposes PATCH
+             * /api/Contracts/{id}/status.
+             * Therefore, only the status is updated here.
+             */
             existingContract.Status = contract.Status;
-            existingContract.ServiceLevel = contract.ServiceLevel;
 
-            if (agreementFile != null)
+            try
             {
-                DeleteAgreementFile(existingContract);
-                await SaveAgreementFileAsync(
-                    existingContract,
-                    agreementFile);
+                await _contractService.UpdateAsync(
+                    existingContract);
+
+                TempData["SuccessMessage"] =
+                    "Contract status updated successfully.";
+
+                return RedirectToAction(
+                    nameof(Index));
             }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+            catch (HttpRequestException)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "The contract status could not be updated because the API request failed.");
 
-            await _contractService.UpdateAsync(existingContract);
+                await LoadClientsAsync(
+                    contract.ClientId);
 
-            TempData["SuccessMessage"] =
-                "Contract updated successfully.";
-
-            return RedirectToAction(nameof(Index));
+                return View(contract);
+            }
         }
 
         public async Task<IActionResult> Delete(int? id)
@@ -192,7 +237,8 @@ namespace TechMoveGLMS.Web.Controllers
             }
 
             Contract? contract =
-                await _contractService.GetByIdAsync(id.Value);
+                await _contractService.GetByIdAsync(
+                    id.Value);
 
             if (contract == null)
             {
@@ -204,33 +250,20 @@ namespace TechMoveGLMS.Web.Controllers
 
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public IActionResult DeleteConfirmed(int id)
         {
-            Contract? contract =
-                await _contractService.GetByIdAsync(id);
-
-            if (contract == null)
-            {
-                return NotFound();
-            }
-
-            try
-            {
-                await _contractService.DeleteAsync(id);
-                DeleteAgreementFile(contract);
-
-                TempData["SuccessMessage"] =
-                    "Contract deleted successfully.";
-            }
-            catch (InvalidOperationException exception)
-            {
-                TempData["ErrorMessage"] = exception.Message;
-            }
+            /*
+             * The current Contracts API does not expose
+             * a DELETE endpoint.
+             */
+            TempData["ErrorMessage"] =
+                "Deleting contracts is not supported by the Contracts API.";
 
             return RedirectToAction(nameof(Index));
         }
 
-        public async Task<IActionResult> DownloadAgreement(int id)
+        public async Task<IActionResult> DownloadAgreement(
+            int id)
         {
             Contract? contract =
                 await _contractService.GetByIdAsync(id);
@@ -252,13 +285,14 @@ namespace TechMoveGLMS.Web.Controllers
             }
 
             byte[] fileBytes =
-                await System.IO.File.ReadAllBytesAsync(filePath);
+                await System.IO.File.ReadAllBytesAsync(
+                    filePath);
 
             return File(
                 fileBytes,
                 "application/pdf",
                 contract.AgreementFileName ??
-                    "ContractAgreement.pdf");
+                "ContractAgreement.pdf");
         }
 
         private async Task LoadClientsAsync(
@@ -287,9 +321,11 @@ namespace TechMoveGLMS.Web.Controllers
                 selectedClientId);
         }
 
-        private void ValidateContractDates(Contract contract)
+        private void ValidateContractDates(
+            Contract contract)
         {
-            if (contract.EndDate < contract.StartDate)
+            if (contract.EndDate <
+                contract.StartDate)
             {
                 ModelState.AddModelError(
                     nameof(contract.EndDate),
@@ -297,13 +333,16 @@ namespace TechMoveGLMS.Web.Controllers
             }
         }
 
-        private void ValidateAgreementFile(IFormFile file)
+        private void ValidateAgreementFile(
+            IFormFile file)
         {
             string extension =
-                Path.GetExtension(file.FileName).ToLowerInvariant();
+                Path.GetExtension(file.FileName)
+                    .ToLowerInvariant();
 
             if (extension != ".pdf" ||
-                file.ContentType != "application/pdf")
+                file.ContentType !=
+                "application/pdf")
             {
                 ModelState.AddModelError(
                     "agreementFile",
@@ -329,9 +368,11 @@ namespace TechMoveGLMS.Web.Controllers
             Contract contract,
             IFormFile agreementFile)
         {
-            string agreementFolder = GetAgreementFolder();
+            string agreementFolder =
+                GetAgreementFolder();
 
-            Directory.CreateDirectory(agreementFolder);
+            Directory.CreateDirectory(
+                agreementFolder);
 
             string storedFileName =
                 $"{Guid.NewGuid()}.pdf";
@@ -343,10 +384,12 @@ namespace TechMoveGLMS.Web.Controllers
             await using FileStream stream =
                 new(filePath, FileMode.Create);
 
-            await agreementFile.CopyToAsync(stream);
+            await agreementFile.CopyToAsync(
+                stream);
 
             contract.AgreementFileName =
-                Path.GetFileName(agreementFile.FileName);
+                Path.GetFileName(
+                    agreementFile.FileName);
 
             contract.AgreementStoredFileName =
                 storedFileName;
@@ -360,10 +403,11 @@ namespace TechMoveGLMS.Web.Controllers
                 "contracts");
         }
 
-        private void DeleteAgreementFile(Contract contract)
+        private void DeleteAgreementFile(
+            Contract contract)
         {
             if (string.IsNullOrWhiteSpace(
-                contract.AgreementStoredFileName))
+                    contract.AgreementStoredFileName))
             {
                 return;
             }

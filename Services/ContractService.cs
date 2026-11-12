@@ -1,16 +1,21 @@
-﻿using Microsoft.EntityFrameworkCore;
-using TechMoveGLMS.Web.Data;
+﻿using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using TechMoveGLMS.Web.Models;
 
 namespace TechMoveGLMS.Web.Services
 {
     public class ContractService : IContractService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly HttpClient _httpClient;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ContractService(ApplicationDbContext context)
+        public ContractService(
+            HttpClient httpClient,
+            IHttpContextAccessor httpContextAccessor)
         {
-            _context = context;
+            _httpClient = httpClient;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<List<Contract>> GetAllAsync(
@@ -19,87 +24,135 @@ namespace TechMoveGLMS.Web.Services
             DateTime? startDate = null,
             DateTime? endDate = null)
         {
-            IQueryable<Contract> query = _context.Contracts
-                .Include(contract => contract.Client)
-                .Include(contract => contract.ServiceRequests);
+            AddAuthorizationHeader();
+
+            var parameters = new List<string>();
 
             if (status.HasValue)
             {
-                query = query.Where(contract =>
-                    contract.Status == status.Value);
+                parameters.Add(
+                    $"status={(int)status.Value}");
             }
 
             if (clientId.HasValue)
             {
-                query = query.Where(contract =>
-                    contract.ClientId == clientId.Value);
+                parameters.Add(
+                    $"clientId={clientId.Value}");
             }
 
             if (startDate.HasValue)
             {
-                query = query.Where(contract =>
-                    contract.StartDate >= startDate.Value);
+                parameters.Add(
+                    $"startDate={startDate.Value:yyyy-MM-dd}");
             }
 
             if (endDate.HasValue)
             {
-                query = query.Where(contract =>
-                    contract.EndDate <= endDate.Value);
+                parameters.Add(
+                    $"endDate={endDate.Value:yyyy-MM-dd}");
             }
 
-            return await query
-                .OrderByDescending(contract => contract.StartDate)
-                .ToListAsync();
+            var endpoint = "api/Contracts";
+
+            if (parameters.Count > 0)
+            {
+                endpoint += "?" + string.Join("&", parameters);
+            }
+
+            var contracts =
+                await _httpClient.GetFromJsonAsync<List<Contract>>(
+                    endpoint);
+
+            return contracts ?? new List<Contract>();
         }
 
         public async Task<Contract?> GetByIdAsync(int id)
         {
-            return await _context.Contracts
-                .Include(contract => contract.Client)
-                .Include(contract => contract.ServiceRequests)
-                .FirstOrDefaultAsync(contract =>
-                    contract.ContractId == id);
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/Contracts/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content
+                .ReadFromJsonAsync<Contract>();
         }
 
         public async Task CreateAsync(Contract contract)
         {
-            _context.Contracts.Add(contract);
-            await _context.SaveChangesAsync();
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.PostAsJsonAsync(
+                "api/Contracts",
+                contract);
+
+            response.EnsureSuccessStatusCode();
         }
 
         public async Task UpdateAsync(Contract contract)
         {
-            _context.Contracts.Update(contract);
-            await _context.SaveChangesAsync();
+            AddAuthorizationHeader();
+
+            var statusUpdate = new
+            {
+                status = contract.Status
+            };
+
+            var response = await _httpClient.PatchAsJsonAsync(
+                $"api/Contracts/{contract.ContractId}/status",
+                statusUpdate);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new KeyNotFoundException(
+                    $"Contract with ID {contract.ContractId} was not found.");
+            }
+
+            response.EnsureSuccessStatusCode();
         }
 
-        public async Task DeleteAsync(int id)
+        public Task DeleteAsync(int id)
         {
-            Contract? contract = await _context.Contracts
-                .Include(item => item.ServiceRequests)
-                .FirstOrDefaultAsync(item =>
-                    item.ContractId == id);
-
-            if (contract == null)
-            {
-                return;
-            }
-
-            if (contract.ServiceRequests.Any())
-            {
-                throw new InvalidOperationException(
-                    "A contract with service requests cannot be deleted.");
-            }
-
-            _context.Contracts.Remove(contract);
-            await _context.SaveChangesAsync();
+            throw new NotSupportedException(
+                "Deleting contracts is not supported by the Contracts API.");
         }
 
         public async Task<bool> ExistsAsync(int id)
         {
-            return await _context.Contracts
-                .AnyAsync(contract =>
-                    contract.ContractId == id);
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/Contracts/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            return true;
+        }
+
+        private void AddAuthorizationHeader()
+        {
+            var token = _httpContextAccessor
+                .HttpContext?
+                .Session
+                .GetString("JwtToken");
+
+            _httpClient.DefaultRequestHeaders.Authorization =
+                string.IsNullOrWhiteSpace(token)
+                    ? null
+                    : new AuthenticationHeaderValue(
+                        "Bearer",
+                        token);
         }
     }
 }

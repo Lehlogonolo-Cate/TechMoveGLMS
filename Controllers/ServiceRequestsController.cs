@@ -1,21 +1,29 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using TechMoveGLMS.Web.Filters;
 using TechMoveGLMS.Web.Models;
 using TechMoveGLMS.Web.Services;
 
 namespace TechMoveGLMS.Web.Controllers
 {
+    [SessionAuthorize]
     public class ServiceRequestsController : Controller
     {
-        private readonly IServiceRequestService _serviceRequestService;
-        private readonly ICurrencyService _currencyService;
+        private readonly IServiceRequestService
+            _serviceRequestService;
+
+        private readonly ICurrencyService
+            _currencyService;
 
         public ServiceRequestsController(
             IServiceRequestService serviceRequestService,
             ICurrencyService currencyService)
         {
-            _serviceRequestService = serviceRequestService;
-            _currencyService = currencyService;
+            _serviceRequestService =
+                serviceRequestService;
+
+            _currencyService =
+                currencyService;
         }
 
         public async Task<IActionResult> Index(
@@ -23,18 +31,30 @@ namespace TechMoveGLMS.Web.Controllers
             int? contractId,
             string? searchTerm)
         {
-            var requests = await _serviceRequestService.GetAllAsync(
-                status,
-                contractId,
-                searchTerm);
+            try
+            {
+                var requests =
+                    await _serviceRequestService.GetAllAsync(
+                        status,
+                        contractId,
+                        searchTerm);
 
-            ViewBag.SelectedStatus = status;
-            ViewBag.SelectedContractId = contractId;
-            ViewBag.SearchTerm = searchTerm;
+                ViewBag.SelectedStatus = status;
+                ViewBag.SelectedContractId = contractId;
+                ViewBag.SearchTerm = searchTerm;
 
-            await LoadContractsAsync(contractId);
+                await LoadContractsAsync(contractId);
 
-            return View(requests);
+                return View(requests);
+            }
+            catch (HttpRequestException)
+            {
+                TempData["ErrorMessage"] =
+                    "The service requests could not be loaded because the API is unavailable.";
+
+                return View(
+                    new List<ServiceRequest>());
+            }
         }
 
         public async Task<IActionResult> Details(int? id)
@@ -44,25 +64,47 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            var serviceRequest =
-                await _serviceRequestService.GetByIdAsync(id.Value);
-
-            if (serviceRequest == null)
+            try
             {
-                return NotFound();
-            }
+                var serviceRequest =
+                    await _serviceRequestService
+                        .GetByIdAsync(id.Value);
 
-            return View(serviceRequest);
+                if (serviceRequest == null)
+                {
+                    return NotFound();
+                }
+
+                return View(serviceRequest);
+            }
+            catch (HttpRequestException)
+            {
+                TempData["ErrorMessage"] =
+                    "The service request could not be loaded.";
+
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         public async Task<IActionResult> Create()
         {
-            await LoadContractsAsync();
-
-            return View(new ServiceRequest
+            try
             {
-                Status = ServiceRequestStatus.Pending
-            });
+                await LoadContractsAsync();
+
+                return View(new ServiceRequest
+                {
+                    Status =
+                        ServiceRequestStatus.Pending
+                });
+            }
+            catch (HttpRequestException)
+            {
+                TempData["ErrorMessage"] =
+                    "Active contracts could not be loaded.";
+
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         [HttpPost]
@@ -70,48 +112,80 @@ namespace TechMoveGLMS.Web.Controllers
         public async Task<IActionResult> Create(
             ServiceRequest serviceRequest)
         {
-            if (!await _serviceRequestService.IsContractActiveAsync(
-                    serviceRequest.ContractId))
+            try
             {
-                ModelState.AddModelError(
-                    nameof(serviceRequest.ContractId),
-                    "Please select a valid active contract.");
-            }
+                var contractIsActive =
+                    await _serviceRequestService
+                        .IsContractActiveAsync(
+                            serviceRequest.ContractId);
 
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    serviceRequest.ExchangeRate =
-                        await _currencyService.GetUsdToZarRateAsync();
-
-                    serviceRequest.Cost = Math.Round(
-                        serviceRequest.CostUsd *
-                        serviceRequest.ExchangeRate,
-                        2,
-                        MidpointRounding.AwayFromZero);
-
-                    serviceRequest.Status =
-                        ServiceRequestStatus.Pending;
-
-                    await _serviceRequestService.CreateAsync(
-                        serviceRequest);
-
-                    TempData["SuccessMessage"] =
-                        "Service request created successfully.";
-
-                    return RedirectToAction(nameof(Index));
-                }
-                catch (Exception)
+                if (!contractIsActive)
                 {
                     ModelState.AddModelError(
-                        string.Empty,
-                        "The exchange rate could not be retrieved. " +
-                        "Please check your internet connection and try again.");
+                        nameof(
+                            serviceRequest.ContractId),
+                        "Please select a valid active contract.");
                 }
+
+                if (!ModelState.IsValid)
+                {
+                    await LoadContractsAsync(
+                        serviceRequest.ContractId);
+
+                    return View(serviceRequest);
+                }
+
+                serviceRequest.ExchangeRate =
+                    await _currencyService
+                        .GetUsdToZarRateAsync();
+
+                serviceRequest.Cost = Math.Round(
+                    serviceRequest.CostUsd *
+                    serviceRequest.ExchangeRate,
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                serviceRequest.Status =
+                    ServiceRequestStatus.Pending;
+
+                await _serviceRequestService.CreateAsync(
+                    serviceRequest);
+
+                TempData["SuccessMessage"] =
+                    "Service request created successfully.";
+
+                return RedirectToAction(nameof(Index));
+            }
+            catch (InvalidOperationException exception)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    exception.Message);
+            }
+            catch (HttpRequestException)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "The service request could not be created because an external service or the API is unavailable.");
+            }
+            catch (Exception)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "An unexpected error occurred while creating the service request.");
             }
 
-            await LoadContractsAsync(serviceRequest.ContractId);
+            try
+            {
+                await LoadContractsAsync(
+                    serviceRequest.ContractId);
+            }
+            catch (HttpRequestException)
+            {
+                ViewBag.Contracts =
+                    new List<SelectListItem>();
+            }
+
             return View(serviceRequest);
         }
 
@@ -122,17 +196,29 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            var serviceRequest =
-                await _serviceRequestService.GetByIdAsync(id.Value);
-
-            if (serviceRequest == null)
+            try
             {
-                return NotFound();
+                var serviceRequest =
+                    await _serviceRequestService
+                        .GetByIdAsync(id.Value);
+
+                if (serviceRequest == null)
+                {
+                    return NotFound();
+                }
+
+                await LoadContractsAsync(
+                    serviceRequest.ContractId);
+
+                return View(serviceRequest);
             }
+            catch (HttpRequestException)
+            {
+                TempData["ErrorMessage"] =
+                    "The service request could not be loaded.";
 
-            await LoadContractsAsync(serviceRequest.ContractId);
-
-            return View(serviceRequest);
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         [HttpPost]
@@ -141,54 +227,87 @@ namespace TechMoveGLMS.Web.Controllers
             int id,
             ServiceRequest serviceRequest)
         {
-            if (id != serviceRequest.ServiceRequestId)
+            if (id !=
+                serviceRequest.ServiceRequestId)
             {
                 return NotFound();
             }
 
-            if (!await _serviceRequestService.IsContractActiveAsync(
-                    serviceRequest.ContractId))
+            try
             {
-                ModelState.AddModelError(
-                    nameof(serviceRequest.ContractId),
-                    "Please select a valid active contract.");
-            }
+                var contractIsActive =
+                    await _serviceRequestService
+                        .IsContractActiveAsync(
+                            serviceRequest.ContractId);
 
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    serviceRequest.ExchangeRate =
-                        await _currencyService.GetUsdToZarRateAsync();
-
-                    serviceRequest.Cost = Math.Round(
-                        serviceRequest.CostUsd *
-                        serviceRequest.ExchangeRate,
-                        2,
-                        MidpointRounding.AwayFromZero);
-
-                    await _serviceRequestService.UpdateAsync(
-                        serviceRequest);
-
-                    TempData["SuccessMessage"] =
-                        "Service request updated successfully.";
-
-                    return RedirectToAction(nameof(Index));
-                }
-                catch (KeyNotFoundException)
-                {
-                    return NotFound();
-                }
-                catch (Exception)
+                if (!contractIsActive)
                 {
                     ModelState.AddModelError(
-                        string.Empty,
-                        "The service request could not be updated. " +
-                        "Please check your connection and try again.");
+                        nameof(
+                            serviceRequest.ContractId),
+                        "Please select a valid active contract.");
                 }
+
+                if (!ModelState.IsValid)
+                {
+                    await LoadContractsAsync(
+                        serviceRequest.ContractId);
+
+                    return View(serviceRequest);
+                }
+
+                serviceRequest.ExchangeRate =
+                    await _currencyService
+                        .GetUsdToZarRateAsync();
+
+                serviceRequest.Cost = Math.Round(
+                    serviceRequest.CostUsd *
+                    serviceRequest.ExchangeRate,
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                await _serviceRequestService.UpdateAsync(
+                    serviceRequest);
+
+                TempData["SuccessMessage"] =
+                    "Service request updated successfully.";
+
+                return RedirectToAction(nameof(Index));
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+            catch (InvalidOperationException exception)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    exception.Message);
+            }
+            catch (HttpRequestException)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "The service request could not be updated because an external service or the API is unavailable.");
+            }
+            catch (Exception)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "An unexpected error occurred while updating the service request.");
             }
 
-            await LoadContractsAsync(serviceRequest.ContractId);
+            try
+            {
+                await LoadContractsAsync(
+                    serviceRequest.ContractId);
+            }
+            catch (HttpRequestException)
+            {
+                ViewBag.Contracts =
+                    new List<SelectListItem>();
+            }
+
             return View(serviceRequest);
         }
 
@@ -199,30 +318,52 @@ namespace TechMoveGLMS.Web.Controllers
                 return NotFound();
             }
 
-            var serviceRequest =
-                await _serviceRequestService.GetByIdAsync(id.Value);
-
-            if (serviceRequest == null)
+            try
             {
-                return NotFound();
-            }
+                var serviceRequest =
+                    await _serviceRequestService
+                        .GetByIdAsync(id.Value);
 
-            return View(serviceRequest);
+                if (serviceRequest == null)
+                {
+                    return NotFound();
+                }
+
+                return View(serviceRequest);
+            }
+            catch (HttpRequestException)
+            {
+                TempData["ErrorMessage"] =
+                    "The service request could not be loaded.";
+
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
+        public async Task<IActionResult>
+            DeleteConfirmed(int id)
         {
-            if (!await _serviceRequestService.ExistsAsync(id))
+            try
             {
-                return NotFound();
+                if (!await _serviceRequestService
+                        .ExistsAsync(id))
+                {
+                    return NotFound();
+                }
+
+                await _serviceRequestService
+                    .DeleteAsync(id);
+
+                TempData["SuccessMessage"] =
+                    "Service request deleted successfully.";
             }
-
-            await _serviceRequestService.DeleteAsync(id);
-
-            TempData["SuccessMessage"] =
-                "Service request deleted successfully.";
+            catch (HttpRequestException)
+            {
+                TempData["ErrorMessage"] =
+                    "The service request could not be deleted because the API is unavailable.";
+            }
 
             return RedirectToAction(nameof(Index));
         }
@@ -231,17 +372,25 @@ namespace TechMoveGLMS.Web.Controllers
             int? selectedContractId = null)
         {
             var contracts =
-                await _serviceRequestService.GetActiveContractsAsync();
+                await _serviceRequestService
+                    .GetActiveContractsAsync();
 
-            ViewBag.Contracts = contracts.Select(contract =>
-                new SelectListItem
-                {
-                    Value = contract.ContractId.ToString(),
-                    Text = $"{contract.Client?.Name} - " +
-                           $"{contract.ServiceLevel}",
-                    Selected =
-                        contract.ContractId == selectedContractId
-                }).ToList();
+            ViewBag.Contracts = contracts
+                .Select(contract =>
+                    new SelectListItem
+                    {
+                        Value =
+                            contract.ContractId.ToString(),
+
+                        Text =
+                            $"{contract.Client?.Name} - " +
+                            $"{contract.ServiceLevel}",
+
+                        Selected =
+                            contract.ContractId ==
+                            selectedContractId
+                    })
+                .ToList();
         }
     }
 }

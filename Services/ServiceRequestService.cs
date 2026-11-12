@@ -1,16 +1,21 @@
-﻿using Microsoft.EntityFrameworkCore;
-using TechMoveGLMS.Web.Data;
+﻿using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using TechMoveGLMS.Web.Models;
 
 namespace TechMoveGLMS.Web.Services
 {
     public class ServiceRequestService : IServiceRequestService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly HttpClient _httpClient;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ServiceRequestService(ApplicationDbContext context)
+        public ServiceRequestService(
+            HttpClient httpClient,
+            IHttpContextAccessor httpContextAccessor)
         {
-            _context = context;
+            _httpClient = httpClient;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<IEnumerable<ServiceRequest>> GetAllAsync(
@@ -18,74 +23,121 @@ namespace TechMoveGLMS.Web.Services
             int? contractId = null,
             string? searchTerm = null)
         {
-            var query = _context.ServiceRequests
-                .Include(request => request.Contract)
-                .ThenInclude(contract => contract!.Client)
-                .AsQueryable();
+            AddAuthorizationHeader();
+
+            var parameters = new List<string>();
 
             if (status.HasValue)
             {
-                query = query.Where(request =>
-                    request.Status == status.Value);
+                parameters.Add(
+                    $"status={(int)status.Value}");
             }
 
             if (contractId.HasValue)
             {
-                query = query.Where(request =>
-                    request.ContractId == contractId.Value);
+                parameters.Add(
+                    $"contractId={contractId.Value}");
             }
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                query = query.Where(request =>
-                    request.Description.Contains(searchTerm) ||
-                    request.Contract!.ServiceLevel.Contains(searchTerm) ||
-                    request.Contract.Client!.Name.Contains(searchTerm));
+                parameters.Add(
+                    $"search={Uri.EscapeDataString(searchTerm)}");
             }
 
-            return await query
-                .OrderByDescending(request => request.CreatedAt)
-                .ToListAsync();
+            var endpoint = "api/ServiceRequests";
+
+            if (parameters.Count > 0)
+            {
+                endpoint += "?" + string.Join("&", parameters);
+            }
+
+            var requests = await _httpClient
+                .GetFromJsonAsync<List<ServiceRequest>>(endpoint);
+
+            return requests ?? new List<ServiceRequest>();
         }
 
         public async Task<ServiceRequest?> GetByIdAsync(int id)
         {
-            return await _context.ServiceRequests
-                .Include(request => request.Contract)
-                .ThenInclude(contract => contract!.Client)
-                .FirstOrDefaultAsync(request =>
-                    request.ServiceRequestId == id);
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/ServiceRequests/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content
+                .ReadFromJsonAsync<ServiceRequest>();
         }
 
-        public async Task<IEnumerable<Contract>> GetActiveContractsAsync()
+        public async Task<IEnumerable<Contract>>
+            GetActiveContractsAsync()
         {
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/Contracts?status={(int)ContractStatus.Active}");
+
+            response.EnsureSuccessStatusCode();
+
+            var contracts = await response.Content
+                .ReadFromJsonAsync<List<Contract>>();
+
             var today = DateTime.Today;
 
-            return await _context.Contracts
-                .Include(contract => contract.Client)
+            return (contracts ?? new List<Contract>())
                 .Where(contract =>
                     contract.Status == ContractStatus.Active &&
-                    contract.StartDate <= today &&
-                    contract.EndDate >= today)
-                .OrderBy(contract => contract.Client!.Name)
+                    contract.StartDate.Date <= today &&
+                    contract.EndDate.Date >= today)
+                .OrderBy(contract => contract.Client?.Name)
                 .ThenBy(contract => contract.ServiceLevel)
-                .ToListAsync();
+                .ToList();
         }
 
-        public async Task<bool> IsContractActiveAsync(int contractId)
+        public async Task<bool> IsContractActiveAsync(
+            int contractId)
         {
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/Contracts/{contractId}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var contract = await response.Content
+                .ReadFromJsonAsync<Contract>();
+
+            if (contract == null)
+            {
+                return false;
+            }
+
             var today = DateTime.Today;
 
-            return await _context.Contracts.AnyAsync(contract =>
-                contract.ContractId == contractId &&
-                contract.Status == ContractStatus.Active &&
-                contract.StartDate <= today &&
-                contract.EndDate >= today);
+            return contract.Status == ContractStatus.Active &&
+                   contract.StartDate.Date <= today &&
+                   contract.EndDate.Date >= today;
         }
 
-        public async Task CreateAsync(ServiceRequest serviceRequest)
+        public async Task CreateAsync(
+            ServiceRequest serviceRequest)
         {
-            if (!await IsContractActiveAsync(serviceRequest.ContractId))
+            AddAuthorizationHeader();
+
+            if (!await IsContractActiveAsync(
+                    serviceRequest.ContractId))
             {
                 throw new InvalidOperationException(
                     "Service requests can only be created for active contracts.");
@@ -93,56 +145,83 @@ namespace TechMoveGLMS.Web.Services
 
             serviceRequest.CreatedAt = DateTime.UtcNow;
 
-            _context.ServiceRequests.Add(serviceRequest);
-            await _context.SaveChangesAsync();
+            var response = await _httpClient.PostAsJsonAsync(
+                "api/ServiceRequests",
+                serviceRequest);
+
+            response.EnsureSuccessStatusCode();
         }
 
-        public async Task UpdateAsync(ServiceRequest serviceRequest)
+        public async Task UpdateAsync(
+            ServiceRequest serviceRequest)
         {
-            if (!await IsContractActiveAsync(serviceRequest.ContractId))
+            AddAuthorizationHeader();
+
+            if (!await IsContractActiveAsync(
+                    serviceRequest.ContractId))
             {
                 throw new InvalidOperationException(
                     "Service requests can only be linked to active contracts.");
             }
 
-            var existingRequest =
-                await _context.ServiceRequests.FindAsync(
-                    serviceRequest.ServiceRequestId);
+            var response = await _httpClient.PutAsJsonAsync(
+                $"api/ServiceRequests/{serviceRequest.ServiceRequestId}",
+                serviceRequest);
 
-            if (existingRequest == null)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 throw new KeyNotFoundException(
                     "The service request could not be found.");
             }
 
-            existingRequest.ContractId = serviceRequest.ContractId;
-            existingRequest.Description = serviceRequest.Description;
-            existingRequest.CostUsd = serviceRequest.CostUsd;
-            existingRequest.ExchangeRate = serviceRequest.ExchangeRate;
-            existingRequest.Cost = serviceRequest.Cost;
-            existingRequest.Status = serviceRequest.Status;
-
-            await _context.SaveChangesAsync();
+            response.EnsureSuccessStatusCode();
         }
 
         public async Task DeleteAsync(int id)
         {
-            var serviceRequest =
-                await _context.ServiceRequests.FindAsync(id);
+            AddAuthorizationHeader();
 
-            if (serviceRequest == null)
+            var response = await _httpClient.DeleteAsync(
+                $"api/ServiceRequests/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return;
             }
 
-            _context.ServiceRequests.Remove(serviceRequest);
-            await _context.SaveChangesAsync();
+            response.EnsureSuccessStatusCode();
         }
 
         public async Task<bool> ExistsAsync(int id)
         {
-            return await _context.ServiceRequests.AnyAsync(request =>
-                request.ServiceRequestId == id);
+            AddAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync(
+                $"api/ServiceRequests/{id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            return true;
+        }
+
+        private void AddAuthorizationHeader()
+        {
+            var token = _httpContextAccessor
+                .HttpContext?
+                .Session
+                .GetString("JwtToken");
+
+            _httpClient.DefaultRequestHeaders.Authorization =
+                string.IsNullOrWhiteSpace(token)
+                    ? null
+                    : new AuthenticationHeaderValue(
+                        "Bearer",
+                        token);
         }
     }
 }

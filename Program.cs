@@ -1,27 +1,54 @@
-using Microsoft.EntityFrameworkCore;
-using TechMoveGLMS.Web.Data;
 using TechMoveGLMS.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add MVC services.
 builder.Services.AddControllersWithViews();
 
-// Connect Entity Framework Core to SQL Server.
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHttpContextAccessor();
 
-// Register application services.
-builder.Services.AddScoped<IClientService, ClientService>();
-builder.Services.AddScoped<IContractService, ContractService>();
-builder.Services.AddScoped<IServiceRequestService, ServiceRequestService>();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
-builder.Services.AddHttpClient<ICurrencyService, CurrencyService>();
+var apiBaseUrl =
+    builder.Configuration["ApiSettings:BaseUrl"]
+    ?? "http://localhost:5039/";
+
+builder.Services.AddHttpClient<AuthService>(
+    client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+    });
+
+builder.Services.AddHttpClient<IClientService, ClientService>(
+    client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+    });
+
+builder.Services.AddHttpClient<IContractService, ContractService>(
+    client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+    });
+
+builder.Services.AddHttpClient<
+    IServiceRequestService,
+    ServiceRequestService>(
+    client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+    });
+
+builder.Services.AddHttpClient<
+    ICurrencyService,
+    CurrencyService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -31,13 +58,15 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
+app.UseSession();
+
 app.UseAuthorization();
 
 app.MapStaticAssets();
 
 app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 app.Run();
